@@ -17,20 +17,29 @@ public class StocksController extends Controller<StockContext> {
 	@Action("list")
 	public CallResult list() {
 		console.result("-- Stocks");
-		context.s().forEach(stock -> console.result("- " + stock.getName() + " : " + stock.getBuyPrice()));
+		context.s().forEach(stock -> console.result("- " + stock));
 		return CallResult.SUCCESS;
 	}
 
 	@Action("fetch")
 	public CallResult fetch(String stock) {
-		final BovespaRequest req = new BovespaRequest();
-		console.result(String.format("Stock value for %s is: %s", stock, req.getCurrentValue(stock)));
+		final BovespaRequest bovespa = new BovespaRequest();
+		console.result(String.format("Stock value for %s is: %s", stock, bovespa.getCurrentValue(stock)));
+		return CallResult.SUCCESS;
+	}
+
+	@Action("update")
+	public CallResult update() {
+		final BovespaRequest bovespa = new BovespaRequest();
+		context.s().forEach(stock -> stock.updatePrice(bovespa));
+		console.result("Updated successfully.");
 		return CallResult.SUCCESS;
 	}
 
 	public static void defaultCallables(String name, List<Callable> callables) {
-		callables.add(new ActionCall(name + ":list", ":stocks", "List all stocks"));
-		callables.add(new ActionCall(name + ":fetch", ":fetch stock", "Fetch current value for a specific stock"));
+		callables.add(new ActionCall(name + ":list", ":stocks", "List all stocks."));
+		callables.add(new ActionCall(name + ":fetch", ":fetch stock", "Fetch current value for a specific stock."));
+		callables.add(new ActionCall(name + ":update", ":update", "Update current value of all stocks."));
 	}
 
 }

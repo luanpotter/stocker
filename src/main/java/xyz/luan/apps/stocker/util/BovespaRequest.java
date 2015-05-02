@@ -6,6 +6,8 @@ import java.net.URISyntaxException;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClients;
@@ -26,6 +28,7 @@ public class BovespaRequest {
 		try {
 			HttpClient httpclient = HttpClients.createDefault();
 			HttpGet req = new HttpGet(new URIBuilder(URL).setParameter(CODE, stock).build());
+			req.setConfig(RequestConfig.custom().setCookieSpec(CookieSpecs.IGNORE_COOKIES).build());
 
 			HttpResponse response = httpclient.execute(req);
 			HttpEntity entity = response.getEntity();
@@ -46,7 +49,7 @@ public class BovespaRequest {
 
 		Document doc = jdomBuilder.build(entity.getContent());
 		XPathExpression<Element> expr = xFactory.compile("//ComportamentoPapeis/Papel", Filters.element());
-		return convertToDouble(expr.evaluate(doc).get(0).getAttribute("Medio").getValue());
+		return convertToDouble(expr.evaluate(doc).get(0).getAttribute("Ultimo").getValue());
 	}
 
 	private double convertToDouble(String value) {

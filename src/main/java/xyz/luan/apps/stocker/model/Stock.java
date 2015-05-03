@@ -1,86 +1,82 @@
 package xyz.luan.apps.stocker.model;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-import xyz.luan.apps.stocker.util.BovespaRequest;
+import lombok.Getter;
 
 public class Stock implements Serializable {
 
-	private static final long serialVersionUID = -7744728250101428108L;
+    private static final long serialVersionUID = -7744728250101428108L;
 
-	private static final String STOCKS_FILE = ".stocker";
+    @Getter
+    private String name;
 
-	private String name;
-	private double buyPrice;
-	private int amount;
-	private Double currentPrice;
+    private Map<LocalDateTime, Double> prices;
+    private List<Acquisition> acquisitions;
 
-	public Stock(String name, int amount, double buyPrice) {
-		this.name = name;
-		this.amount = amount;
-		this.buyPrice = buyPrice;
-	}
+    public Stock(String name) {
+        this.name = name;
+        this.acquisitions = new ArrayList<>();
+        this.prices = new HashMap<>();
+    }
 
-	public static Stock fromLine(String line, BovespaRequest bovespa) {
-		String[] parts = line.split(":");
-		Stock stock = new Stock(parts[0], Integer.parseInt(parts[1]), Double.parseDouble(parts[2]));
-		stock.updatePrice(bovespa);
-		return stock;
-	}
+    public void updatePrice(double price) {
+        prices.put(LocalDateTime.now(), price);
+    }
 
-	public String getName() {
-		return name;
-	}
+    public Double speed() {
+        if (prices.size() < 2) {
+            return null;
+        }
+        ArrayList<LocalDateTime> dateList = sortedDates();
+        LocalDateTime from = dateList.get(1);
+        LocalDateTime to = dateList.get(0);
+        return (prices.get(to) - prices.get(from)) / getDuration(from, to);
+    }
 
-	public double getBuyPrice() {
-		return buyPrice;
-	}
+    private ArrayList<LocalDateTime> sortedDates() {
+        ArrayList<LocalDateTime> priceList = new ArrayList<>(prices.keySet());
+        Collections.sort(priceList, Collections.reverseOrder());
+        return priceList;
+    }
 
-	public Double getCurrentPrice() {
-		return currentPrice;
-	}
+    public long getDuration(LocalDateTime start, LocalDateTime end) {
+        Instant startInstant = start.toInstant(ZoneOffset.UTC);
+        Instant endInstant = end.toInstant(ZoneOffset.UTC);
+        return Duration.between(startInstant, endInstant).toNanos();
+    }
 
-	public int getAmount() {
-		return amount;
-	}
+    public void buy(int amount, double value) {
+        this.acquisitions.add(new Acquisition(amount, value));
+    }
 
-	public static Set<Stock> readOrCreate() {
-		final BovespaRequest bovespa = new BovespaRequest();
-		File file = new File(STOCKS_FILE);
-		HashSet<Stock> stocks = new HashSet<>();
-		if (file.exists()) {
-			try (BufferedReader r = new BufferedReader(new FileReader(file))) {
-				String line;
-				while ((line = r.readLine()) != null) {
-					stocks.add(Stock.fromLine(line, bovespa));
-				}
-			} catch (IOException e) {
-				throw new RuntimeException("ooppps..", e); // TODO pretty this
-			}
-		}
-		return stocks;
-	}
+    public int totalAmount() {
+        return acquisitions.stream().collect(Collectors.summingInt(s -> s.getAmount()));
+    }
 
-	public void updatePrice(BovespaRequest bovespa) {
-		this.currentPrice = bovespa.getCurrentValue(this.name);
-	}
+    public double averageBuyPrice() {
+        return acquisitions.stream().collect(Collectors.averagingDouble(s -> s.getValue()));
+    }
 
-	public double relativeProfit() {
-		return profit() / buyPrice;
-	}
+    private double currentPrice() {
+        ArrayList<LocalDateTime> dateList = sortedDates();
+        return prices.get(dateList.get(0));
+    }
 
-	public double profit() {
-		return currentPrice - buyPrice;
-	}
-
-	@Override
-	public String toString() {
-		return String.format("%s (%d) [%.2f -> %.2f] [%+.2f (%+.4f)]", getName(), getAmount(), getBuyPrice(), getCurrentPrice(), profit(), relativeProfit());
-	}
+    public String toString() {
+        double buyPrice = averageBuyPrice();
+        double currentPrice = currentPrice();
+        double profit = currentPrice - buyPrice;
+        return String.format("%s [%.2f -> %.2f] [%+.2f (%+.2f)]", name, buyPrice, currentPrice, profit, profit / (totalAmount() * buyPrice));
+    }
 }
